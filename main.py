@@ -181,8 +181,18 @@ interesting_game_1 = np.array([
 #  [-45  29   0  17]
 #  [-17 -21 -17   0]]
 
+# Ditto, for three alternatives
+# [[  0 -13  29]
+#  [ 13   0 -25]
+#  [-29  25   0]]
+
+# Ditto
+# [[  0 -15  13]
+#  [ 15   0  -9]
+#  [-13   9   0]]
+
 if __name__ == '__main__':
-    game = create_random_wmg(4, ensure_oddity=True, exclude_weak_condorcet_winner=True)
+    game = create_random_wmg(3, ensure_oddity=True, exclude_weak_condorcet_winner=True)
     # game = sample_game
     # game = interesting_game_1
     print(game)
