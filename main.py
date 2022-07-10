@@ -1,10 +1,11 @@
 import numpy as np
 import cvxpy as cp
 from random import randrange
+import sys
 
 
 def create_random_wmg(alternative_count,
-                      max_margin=100,
+                      max_margin=50,
                       ensure_oddity=False,
                       exclude_weak_condorcet_winner=False,
                       exclude_weak_condorcet_loser=False):
@@ -39,6 +40,12 @@ def create_random_wmg(alternative_count,
     return weighted_majority_graph
 
 
+# Takes as an input any function on the reals and returns an odd function wich is identical for positive numbers
+# TODO give option to normalize (assuring tau(0) = 0 and tau(1) = 1
+def oddify(tau):
+    return lambda x: tau(x) if x >= 0 else -tau(-x)
+
+
 def maximin(game_matrix, print_output=False):
     assert game_matrix.ndim == 2
     shape = game_matrix.shape
@@ -66,9 +73,9 @@ def shapley_saddle():
 
 
 # Compute a maximal lottery. When multiple exist, an arbitrary one may be returned
-def compute_maximal_lottery(margin_matrix, tau=lambda x: x):
+def compute_maximal_lottery(margin_matrix, tau=lambda x: x, oddify_tau=True):
     # TODO assure that tau is sound, that is that tau(1) = 1 and tau is odd and monotone
-    margin_matrix = np.vectorize(tau, otypes=[int])(margin_matrix)
+    margin_matrix = np.vectorize(oddify(tau) if oddify_tau else tau, otypes=[int])(margin_matrix)
     status, security_level, lottery = maximin(margin_matrix)
     if status != 'optimal':
         raise Exception(f'The status of the problem was {status} instead of \'optimal\'.')
@@ -78,14 +85,42 @@ def compute_maximal_lottery(margin_matrix, tau=lambda x: x):
 
 
 def maximal_lottery_power(margin_matrix, power=1, print_output=False):
-    if not isinstance(power, int) or power < 1 or power % 2 != 1:
+    if not isinstance(power, int) or power < 1:
         raise Exception(f'The power {power} does not result in a sound function tau.')
-    lottery = compute_maximal_lottery(margin_matrix, tau=lambda x: x ** power)
+    lottery = compute_maximal_lottery(margin_matrix, tau=lambda x: x ** power, oddify_tau=True)
     if print_output:
         superscript = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
         print(f'For \u03C4(x) = x{"" if power == 1 else str(power).translate(superscript)}, '
               f'a maximal lottery is {lottery}')
     return lottery
+
+
+# TODO potentially include 0, see if this causes problems with monotonicity
+def power_sequence(
+        margin_matrix,
+        max_power=6,
+        check_for_monotonicity=True,
+        raise_error_on_mono_failure=False,
+        print_output=False
+):
+    lotteries = []
+    for t in range(1, max_power + 1):
+        try:
+            lotteries.append(maximal_lottery_power(margin_matrix, t, print_output))
+        except Exception as e:
+            print(e, file=sys.stderr)
+            break
+    if check_for_monotonicity:
+        monotone = True
+        lotteries = np.asarray(lotteries)
+        for j in range(lotteries.shape[1]):
+            monotone &= np.all(np.equal(lotteries[:, j], sorted(lotteries[:, j])))\
+                        or np.all(np.equal(lotteries[:, j], sorted(lotteries[:, j], reverse=True)))
+            if raise_error_on_mono_failure and not monotone:
+                raise Exception(f'The {j}th sequence of probabilities is {lotteries[:, j]}, which is not sorted.\n'
+                                f'Underlying majority margin matrix is:\n{margin_matrix}')
+        return monotone
+    return None
 
 
 sample_game = np.array([
@@ -114,12 +149,45 @@ interesting_game_1 = np.array([
 #  [-89  75   0 -15]
 #  [ 79 -82  15   0]]
 
+# TODO check for solution uniqueness
+# Potential monotonicity violation
+# [[  0 -32  44  26]
+#  [ 32   0 -42 -45]
+#  [-44  42   0  41]
+#  [-26  45 -41   0]]
+
+# TODO this was odd, so this might be a real counterexample
+# Potential monotonicity violation
+# [[  0  33   9 -25]
+#  [-33   0  -3  23]
+#  [ -9   3   0   5]
+#  [ 25 -23  -5   0]]
+
+# Another potential mono violation
+# [[  0  37 -31  19]
+#  [-37   0 -19  49]
+#  [ 31  19   0 -39]
+#  [-19 -49  39   0]]
+
+# Ditto
+# [[  0  41  41 -47]
+#  [-41   0   9  -5]
+#  [-41  -9   0  25]
+#  [ 47   5 -25   0]]
+
+# Ditto, maximum surprisingly at x^3
+# [[  0 -41  45  17]
+#  [ 41   0 -29  21]
+#  [-45  29   0  17]
+#  [-17 -21 -17   0]]
 
 if __name__ == '__main__':
-    game = create_random_wmg(4, exclude_weak_condorcet_winner=True)
+    game = create_random_wmg(4, ensure_oddity=True, exclude_weak_condorcet_winner=True)
     # game = sample_game
     # game = interesting_game_1
     print(game)
-    maximal_lottery_power(game, 1, True)
-    maximal_lottery_power(game, 3, True)
-    maximal_lottery_power(game, 5, True)
+    mono = power_sequence(game, check_for_monotonicity=True, raise_error_on_mono_failure=True, print_output=True)
+    if mono:
+        print('The lotteries are monotonous.')
+    else:
+        print('The lotteries are not monotonous!', file=sys.stderr)
