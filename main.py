@@ -310,15 +310,29 @@ semi_mono_violation = [
     [19, 27, -15, 0]
 ]
 
+# Counterexample for iterated removal of bad actions
+# [[  0  -3  27 -15]
+#  [  3   0   3  -1]
+#  [-27  -3   0  11]
+#  [ 15   1 -11   0]]
+
+# Counterexample for always winner of C2-ML
+# [[  0  19 -23 -23]
+#  [-19   0  21  25]
+#  [ 23 -21   0 -15]
+#  [ 23 -25  15   0]]
+
+
 if __name__ == '__main__':
-    # game = create_random_wmg(3, max_margin=30, ensure_oddity=True, exclude_weak_condorcet_winner=True)
+    game = create_random_wmg(4, max_margin=30, ensure_oddity=True, exclude_weak_condorcet_winner=True)
     # game = sample_game
     # game = interesting_game_1
-    game = test_game
+    # game = semi_mono_violation
     print(game)
     mono = power_sequence(
         game,
         check_for_monotonicity=True,
+        semi_monotonicity=True,
         raise_error_on_mono_failure=True,
         print_output=True
     )
