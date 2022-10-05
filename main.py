@@ -1,7 +1,6 @@
-import numpy
 import numpy as np
 import cvxpy as cp
-from random import randrange
+from random import randrange, shuffle
 import sys
 from scipy.optimize import linprog
 
@@ -39,6 +38,28 @@ def create_random_wmg(alternative_count,
                                          ensure_oddity,
                                          exclude_weak_condorcet_winner,
                                          exclude_weak_condorcet_loser)
+    return weighted_majority_graph
+
+
+# This takes as an input a list of tuples, which represents the order of edge weights, from lowest to highest.
+# An edge between i and j is represented by the tuple (i, j). Uniqueness and completeness must be ensured by the user.
+# Returns a weighted majority graph where the weights are in the given order.
+def create_graph_specific_four_wmg(prios, max_margin=30):
+    # Create the raw values
+    vals = []
+    while len(vals) < len(prios):
+        new_val = randrange(1, max_margin + 1, 2)
+        if new_val not in vals:
+            vals.append(new_val)
+    vals.sort()
+
+    # Create and fill the matrix
+    alternative_count = max([max(pair) for pair in prios]) + 1
+    weighted_majority_graph = np.zeros((alternative_count, alternative_count), dtype=int)
+    for i, j in prios:
+        val = vals.pop(0)
+        weighted_majority_graph[i, j] = val
+        weighted_majority_graph[j, i] = -val
     return weighted_majority_graph
 
 
@@ -143,9 +164,10 @@ def power_sequence(
             print(e)
             break
         # lotteries.append(maximal_lottery_power(margin_matrix, t, print_output))
+
+    lotteries = np.asarray(lotteries)
     if check_for_monotonicity:
         monotone = True
-        lotteries = np.asarray(lotteries)
         for j in range(lotteries.shape[1]):
             if semi_monotonicity:
                 curr_mono = True
@@ -165,7 +187,7 @@ def power_sequence(
                 raise Exception(f'The {j}th sequence of probabilities is {lotteries[:, j]}, which is not sorted.\n'
                                 f'Underlying majority margin matrix is:\n{margin_matrix}')
         return monotone
-    return None
+    return lotteries
 
 
 def check_mass_mono(
@@ -191,6 +213,18 @@ def check_mass_mono(
     if print_output:
         print(f'Checked {game_count} games, {mono_violation_count} of which were not monotonous.')
     return mono_violation_count
+
+
+def winner(lotteries, threshold=0.65, print_output=False):
+    winning_alternative = np.argmax(lotteries, 1)[-1]
+    winning_prob = np.max(lotteries, 1)[-1]
+    if threshold:
+        if winning_prob < threshold:
+            raise Exception(f'The winning alternative in the last lottery was only {winning_prob}')
+    if print_output:
+        print(f'The last lottery was won by alternative {winning_alternative} '
+              'with sufficient probability to indicate convergence.')
+    return winning_alternative
 
 
 sample_game = np.array([
@@ -323,21 +357,43 @@ semi_mono_violation = [
 #  [ 23 -25  15   0]]
 
 
+# Current test
+# [[  0 -27  23]
+#  [ 27   0 -11]
+#  [-23  11   0]]
+
+# m_da smallest edge, but d wins
+# [[  0   9  17  -3]
+#  [ -9   0  25   5]
+#  [-17 -25   0   7]
+#  [  3  -5  -7   0]]
+
 if __name__ == '__main__':
-    game = create_random_wmg(4, max_margin=30, ensure_oddity=True, exclude_weak_condorcet_winner=True)
+    # game = create_random_wmg(4, max_margin=30, ensure_oddity=True, exclude_weak_condorcet_winner=True)
+    tail = [(3, 0), (1, 2), (2, 3), (0, 1), (1, 3)]
+    shuffle(tail)
+    game = create_graph_specific_four_wmg([(0, 2)] + tail)
     # game = sample_game
     # game = interesting_game_1
     # game = semi_mono_violation
     print(game)
-    mono = power_sequence(
+    lotteries = power_sequence(
         game,
-        check_for_monotonicity=True,
-        semi_monotonicity=True,
-        raise_error_on_mono_failure=True,
+        check_for_monotonicity=False,
         print_output=True
     )
-    if mono:
-        print('The lotteries are monotonous.')
-    else:
-        print('The lotteries are not monotonous!', file=sys.stderr)
+    winner(lotteries, print_output=True)
+
+    # semi_monotonicity_check = True
+    # mono = power_sequence(
+    #     game,
+    #     check_for_monotonicity=True,
+    #     semi_monotonicity=semi_monotonicity_check,
+    #     raise_error_on_mono_failure=True,
+    #     print_output=True
+    # )
+    # if mono:
+    #     print(f'The lotteries are {"semi-" if semi_monotonicity_check else ""}monotonous.')
+    # else:
+    #     print(f'The lotteries are not {"semi-" if semi_monotonicity_check else ""}monotonous!', file=sys.stderr)
     # check_mass_mono(100, alt_count=4, semi_monotonicity=True, raise_error_on_mono_failure=True, print_output=True)
