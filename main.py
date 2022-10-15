@@ -7,6 +7,15 @@ import sys
 from scipy.optimize import linprog
 
 
+color_dict = {
+    0: '\033[94m',
+    1: '\033[96m',
+    2: '\033[92m',
+    3: '\033[93m',
+    -1: '\033[0m'
+}
+
+
 class CustomException(Exception):
     pass
 
@@ -72,12 +81,13 @@ def create_random_wmg(alternative_count,
 # This takes as an input a list of tuples, which represents the order of edge weights, from lowest to highest.
 # An edge between i and j is represented by the tuple (i, j). Uniqueness and completeness must be ensured by the user.
 # Returns a weighted majority graph where the weights are in the given order.
-def create_graph_specific_ordered_wmg(order, max_margin=30, print_game=False):
+def create_graph_specific_ordered_wmg(order, max_margin=30, randomize_order=False, print_game=False):
     # Create the raw values
     vals = list(range(1, max_margin + 1, 2))
     shuffle(vals)
     vals = vals[:len(order)]
-    vals.sort()
+    if not randomize_order:
+        vals.sort()
     if print_game:
         print(f'The created game has the values {vals}')
 
@@ -277,10 +287,12 @@ def last_slacking_alt(slacks):
     return positive_indices[0]
 
 
-def slack_winner_combination(max_margin=30, print_output=False):
+def slack_winner_combination(max_margin=30, print_output=False, print_game=False):
     positive_margins = [(0, 1), (1, 2), (2, 3), (0, 2), (1, 3), (3, 0)]
-    shuffle(positive_margins)
-    weighted_majority_graph = create_graph_specific_ordered_wmg(positive_margins, max_margin=max_margin, print_game=False)
+    weighted_majority_graph = create_graph_specific_ordered_wmg(positive_margins,
+                                                                max_margin=max_margin,
+                                                                randomize_order=True,
+                                                                print_game=print_game)
     lotteries, slacks = power_sequence(weighted_majority_graph)
     try:
         winning_alternative = winner(lotteries)
@@ -291,14 +303,18 @@ def slack_winner_combination(max_margin=30, print_output=False):
         winning_alternative = None
     slackers = last_slacking_alt(slacks)
     if print_output:
-        print(f'The lottery tends to {winning_alternative} and final slackers were {slackers}')
+        print(f'{color_dict[slackers]}The lottery tends to {winning_alternative}',
+              f'and final slackers were {slackers}{color_dict[-1]}')
     return winning_alternative, slackers
 
 
-def mass_winner_slacker_combination_check(game_count=100, alternative_count=4, max_margin=30, print_output=False):
+def mass_winner_slacker_combination_check(game_count=100, alternative_count=4, max_margin=30,
+                                          print_output=False, print_game=False):
     combination_set = set()
     for _ in range(game_count):
-        combination_set.add(slack_winner_combination(max_margin=max_margin, print_output=print_output))
+        combination_set.add(slack_winner_combination(max_margin=max_margin,
+                                                     print_output=print_output,
+                                                     print_game=print_game))
     if print_output:
         print(f'All occurring combinations of (winner, slack) were {combination_set}')
 
@@ -312,22 +328,11 @@ def compute_winners_of_order(order, game_count=100, max_margin=30, threshold=Non
         lotteries, slacks = power_sequence(weighted_majority_graph)
         winning_alternative = winner(lotteries, threshold=threshold)
         winners.add(winning_alternative)
-        match winning_alternative:
-            case 0:
-                color = '\033[94m'
-            case 1:
-                color = '\033[96m'
-            case 2:
-                color = '\033[92m'
-            case _:
-                color = '\033[93m'
-        if lotteries[-1][winning_alternative] < 0.6:
-            color = '\033[91m'
         if print_simplified_output:
-            print(f'{color}The lottery tends to {winning_alternative},',
+            print(f'{color_dict[winning_alternative]}The lottery tends to {winning_alternative},',
                   f'all alternatives that slacked in computation are {all_slacking_alts(slacks)}\033[0m')
         if print_full_output:
-            print(f'{color}The final lottery of the current game is {lotteries[-1][:]}',
+            print(f'{color_dict[winning_alternative]}The final lottery of the current game is {lotteries[-1][:]}',
                   (f'\tSlack is {slacks[-1][:]}' if print_slack else ''),
                   '\033[0m')
     return winners
@@ -576,6 +581,46 @@ class InterestingGames:
         [21, 25, -23, -29, 11, 0]
     ]
 
+    slacker_supposedly_3 = [
+        [0, 7, 1, -3],
+        [-7, 0, 19, 29],
+        [-1, -19, 0, 11],
+        [3, -29, -11, 0]
+    ]
+
+    # Seems like numerical errors
+    slacker_supposedly_3_v2 = [
+        [0, 13, 1, -23],
+        [-13, 0, 3, 27],
+        [-1, -3, 0, 11],
+        [23, -27, -11, 0]
+    ]
+
+    # Five alternatives, no slackers
+    five_alts_no_slackers = [
+        [0, 5, -3, -21, 43],
+        [-5, 0, 35, -11, -45],
+        [3, -35, 0, 27, -25],
+        [21, 11, -27, 0, -17],
+        [-43, 45, 25, 17, 0]
+    ]
+
+    # Another one
+    # [[0 - 15  47 - 39 - 9]
+    #  [15   0 - 25  43 - 23]
+    # [-47
+    # 25
+    # 0
+    # 13 - 21]
+    # [39 - 43 - 13   0  41]
+    # [9
+    # 23
+    # 21 - 41
+    # 0]]
+
+
+normalized_four_game_edges = [(0, 1), (1, 2), (2, 3), (0, 2), (1, 3), (3, 0)]
+
 
 if __name__ == '__main__':
     # game = create_random_wmg(4, max_margin=30, ensure_oddity=True, exclude_weak_condorcet_winner=True)
@@ -600,17 +645,18 @@ if __name__ == '__main__':
     # print(game)
     # power_sequence(game, print_output=True, print_slack=True)
 
-    # game = create_random_wmg(
-    #     alternative_count=4,
-    #     max_margin=11,
-    #     ensure_uniqueness=True,
-    #     ensure_oddity=True,
-    #     exclude_weak_condorcet_winner=True,
-    #     exclude_weak_condorcet_loser=True
-    # )
-    game = create_graph_specific_ordered_wmg([(2, 3), (0, 2), (0, 1), (3, 0), (1, 2), (1, 3)], max_margin=11)
+    game = create_random_wmg(
+        alternative_count=5,
+        max_margin=50,
+        ensure_uniqueness=True,
+        ensure_oddity=True,
+        exclude_weak_condorcet_winner=True,
+        exclude_weak_condorcet_loser=True
+    )
+    # game = create_graph_specific_ordered_wmg([(2, 3), (0, 2), (0, 1), (3, 0), (1, 2), (1, 3)], max_margin=11)
+    # game = InterestingGames.five_alts_no_slackers
     print(game)
-    power_sequence(game, print_output=True, print_slack=True)
+    power_sequence(game, max_power=10, print_output=True, print_slack=True)
 
     # print(game)
     # power_sequence(game, print_output=True, print_slack=True)
@@ -643,4 +689,4 @@ if __name__ == '__main__':
     # compute_winners_of_order(order=[(1, 2), (2, 3), (1, 3), (0, 2), (3, 0), (0, 1)], max_margin=13,
     #                         print_simplified_output=True, print_full_output=True, print_slack=True, print_game=True)
 
-    # mass_winner_slacker_combination_check(game_count=1000, print_output=True)
+    # mass_winner_slacker_combination_check(game_count=1000, print_output=True, print_game=True)
