@@ -1,8 +1,10 @@
+from functools import reduce
 from itertools import permutations
 
 import numpy as np
 import cvxpy as cp
 from random import randrange, shuffle, choice
+from sympy import Matrix
 import sys
 from scipy.optimize import linprog
 
@@ -34,7 +36,8 @@ def create_random_wmg(alternative_count,
                       ensure_uniqueness=False,
                       ensure_oddity=False,
                       exclude_weak_condorcet_winner=False,
-                      exclude_weak_condorcet_loser=False):
+                      exclude_weak_condorcet_loser=False,
+                      exclude_zero=False):
     assert alternative_count >= 1 and max_margin >= 1
 
     def non_unique_rng():
@@ -55,6 +58,8 @@ def create_random_wmg(alternative_count,
     for i in range(1, alternative_count):
         for j in range(i):
             margin = next(rng)
+            while margin == 0 and exclude_zero:
+                margin = next(rng)
             weighted_majority_graph[i, j] = margin
             weighted_majority_graph[j, i] = -margin
 
@@ -157,6 +162,10 @@ def maximin(game_matrix: np.ndarray, print_output=False):
 
 def shapley_saddle():
     pass
+
+
+def t_game(margin_matrix, t):
+    return np.vectorize(lambda x: x ** t if x > 0 else - (-x) ** t)(margin_matrix)
 
 
 # Compute a maximal lottery. When multiple exist, an arbitrary one may be returned
@@ -346,6 +355,36 @@ def check_whether_winner_is_unique_to_order(max_margin=30, fail_on_multiple=Fals
             print(('\033[91m' if len(winners) > 1 else '\033[94m') + f'The winners of permutation {permutation} are {winners}.\033[0m')
         if fail_on_multiple and len(winners) > 1:
             raise CustomException(f'Permutation {permutation} produced multiple winners {winners}!')
+
+
+def linalg_from_game(matrix, indices: list = None):
+    matrix = np.asarray(matrix)
+    if indices:
+        matrix = matrix[np.ix_(indices, indices)]
+    matrix = np.append(matrix, np.zeros((matrix.shape[0], 1), dtype=int), axis=1)
+    return np.append(matrix, np.ones((1, matrix.shape[1]), dtype=int), axis=0)
+
+
+def rref_from_game(matrix, indices=None):
+    matrix = Matrix(linalg_from_game(matrix, indices))
+    return matrix.rref()
+
+
+def rref_valid(matrix, indices=None, print_output=False):
+    alt_count = len(matrix[0])
+    rref = rref_from_game(matrix, indices)
+    if print_output:
+        print(rref[0])
+    vals = rref[0][alt_count:(alt_count + 1)**2 - 1:alt_count + 1]
+    is_valid = reduce((lambda x, y: x and y), [val >= 0 for val in vals])
+    return is_valid and rref[0][-1] == 0
+
+
+def always_rank_minus_1_test(n, count=1000):
+    for i in range(count):
+        matrix = create_random_wmg(n, max_margin=30)
+        if np.linalg.matrix_rank(matrix) != n - 1:
+            raise Exception(matrix)
 
 
 class InterestingGames:
@@ -618,6 +657,61 @@ class InterestingGames:
     # 21 - 41
     # 0]]
 
+    simple_example_game = [
+        [0, 3, -1],
+        [-3, 0, 1],
+        [1, -1, 0]
+    ]
+
+    outdated_efficiency_counterexample = [
+        [0, 1, 1, -1, -1, 1, 1, 1, 0, -2],
+        [-1, 0, 1, 1, -1, -2, 1, 1, 1, 0],
+        [-1, -1, 0, 1, 1, 0, -2, 1, 1, 1],
+        [1, -1, -1, 0, 1, 1, 0, -2, 1, 1],
+        [1, 1, -1, -1, 0, 1, 1, 0, -2, 1],
+        [-1, 2, 0, -1, -1, 0, 2, 0, 0, -2],
+        [-1, -1, 2, 0, -1, -2, 0, 2, 0, 0],
+        [-1, -1, -1, 2, 0, 0, -2, 0, 2, 0],
+        [0, -1, -1, -1, 2, 0, 0, -2, 0, 2],
+        [2, 0, -1, -1, -1, 2, 0, 0, -2, 0]
+    ]
+
+    efficiency_counterexample = [
+        [0, 0, 0, 2, 2, -3],
+        [0, 0, 0, -3, 2, 2],
+        [0, 0, 0, 2, -3, 2],
+        [-2, 3, -2, 0, 4, -4],
+        [-2, -2, 3, -4, 0, 4],
+        [3, -2, -2, 4, -4, 0]
+    ]
+
+    # [[0   5  21  11 - 27]
+    #  [-5   0  29 - 23 - 7]
+    # [-21 - 29
+    # 0
+    # 23 - 7]
+    # [-11  23 - 23   0  11]
+    # [27
+    # 7
+    # 7 - 11
+    # 0]]
+
+    two_slack_changes = [
+        [0, -7, 7, -13, -7],
+        [7, 0, 23, -15, -25],
+        [-7, -23, 0, -5, 3],
+        [13, 15, 5, 0, -7],
+        [7, 25, -3, 7, 0]
+    ]
+
+    chris_example = [
+        [0, 3, -1, -1, -1],
+        [-3, 0, 3, 1, 3],
+        [1, -3, 0, -3, 1],
+        [1, -1, 3, 0, -3],
+        [1, -3, -1, 3, 0]
+    ]
+
 
 normalized_four_game_edges = [(0, 1), (1, 2), (2, 3), (0, 2), (1, 3), (3, 0)]
 
@@ -645,18 +739,33 @@ if __name__ == '__main__':
     # print(game)
     # power_sequence(game, print_output=True, print_slack=True)
 
-    game = create_random_wmg(
-        alternative_count=5,
-        max_margin=50,
-        ensure_uniqueness=True,
-        ensure_oddity=True,
-        exclude_weak_condorcet_winner=True,
-        exclude_weak_condorcet_loser=True
-    )
+    # game = create_random_wmg(
+    #     alternative_count=5,
+    #     max_margin=30,
+    #     ensure_uniqueness=False,
+    #     ensure_oddity=True,
+    #     exclude_weak_condorcet_winner=True,
+    #     exclude_weak_condorcet_loser=True
+    # )
+    # always_rank_minus_1_test(5, 100000)
+
+    game = InterestingGames.chris_example
+    # print(game)
+    # power_sequence(game, max_power=10, print_output=True, print_slack=True)
+    # print(rref_from_game(game))
+    # print(rref_from_game(t_game(game, 2)))
+    # print(rref_from_game(t_game(game, 3)))
+
+    print(Matrix(t_game(game, 4)).rref())
+
+    # game = InterestingGames.five_alts_no_slackers
+    # game = t_game(game, 1)
+    # print(rref_valid(game, None, True))
+    # game = linalg_from_game(game, [0, 2])
     # game = create_graph_specific_ordered_wmg([(2, 3), (0, 2), (0, 1), (3, 0), (1, 2), (1, 3)], max_margin=11)
     # game = InterestingGames.five_alts_no_slackers
-    print(game)
-    power_sequence(game, max_power=10, print_output=True, print_slack=True)
+    # print(game)
+    # power_sequence(game, max_power=10, print_output=True, print_slack=True)
 
     # print(game)
     # power_sequence(game, print_output=True, print_slack=True)
