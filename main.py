@@ -57,6 +57,7 @@ from utils import *
 #             raise Exception(matrix)
 
 if __name__ == '__main__':
-    pprint(t_matrix(InterestingGames.chris_example.matrix))
+    # pprint(InterestingGames.generic_chris_example.rref())
+    pprint(InterestingGames.generic_chris_example.rref())
 
     InterestingGames.chris_example.power_sequence(print_output=True, print_slack=True)

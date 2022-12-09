@@ -1,4 +1,6 @@
 from game_matrices import GameMatrix
+from sympy import Matrix
+from utils import make_variable
 
 
 class InterestingGames:
@@ -325,3 +327,16 @@ class InterestingGames:
         [1, -1, 3, 0, -3],
         [1, -3, -1, 3, 0]
     ])
+
+    s = make_variable('s')
+    l = make_variable('l')
+
+    generic_chris_example = GameMatrix(
+        Matrix([
+            [0, l, -s, -s, -s],
+            [-l, 0, l, s, l],
+            [s, -l, 0, -l, s],
+            [s, -s, l, 0, -l],
+            [s, -l, -s, l, 0]
+        ])
+    )

@@ -16,6 +16,11 @@ class GameMatrix:
                 if self.matrix[i, j] != -self.matrix[j, i]:
                     raise ValueError(f'Matrix must be skew-symmetric! Received matrix was {self.matrix}')
 
+        self.free_symbols = self.matrix.free_symbols
+        for s in self.free_symbols:
+            if not s.is_nonnegative:
+                raise ValueError(f'All variables used in the matrix must be declared to be non-negative.')
+
     @classmethod
     def random_matrix(
             cls,

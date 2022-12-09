@@ -1,14 +1,21 @@
 import numpy as np
 from scipy.optimize import linprog
-from sympy import Matrix, zeros, ones
-from sympy.abc import t
-
+from sympy import Matrix, zeros, ones, Symbol
+from sympy.functions.elementary.complexes import Abs, sign
 
 superscript = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
 
 
 class SolverException(Exception):
     pass
+
+
+# TODO check if there is some way to use simplification while changing positive to nonnegative
+def make_variable(name):
+    return Symbol(name, nonnegative=True, integer=True)
+
+
+t = Symbol('t', nonnegative=True, integer=True)
 
 
 def maximin(game_matrix: np.ndarray):
@@ -46,8 +53,11 @@ def maximal_lottery(matrix: Matrix):
 
 def t_matrix(matrix: Matrix) -> Matrix:
     matrix = matrix.copy()
-    for i in range(len(matrix)):
-        matrix[i] = 0 if matrix[i] == 0 else matrix[i] ** t if matrix[i] > 0 else -(-matrix[i]) ** t
+    tmp = Symbol('tmp')
+    for s in matrix.free_symbols:
+        matrix = matrix.subs(s, tmp)
+        matrix = matrix.subs(-tmp, -s**t)
+        matrix = matrix.subs(tmp, s**t)
     return matrix
 
 
