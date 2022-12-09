@@ -1,9 +1,17 @@
 import numpy as np
 from scipy.optimize import linprog
-from sympy import Matrix, Symbol, zeros, ones
+from sympy import Matrix, zeros, ones
+from sympy.abc import t
 
 
-def maximin(game_matrix: np.ndarray, print_output=False):
+superscript = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+
+
+class SolverException(Exception):
+    pass
+
+
+def maximin(game_matrix: np.ndarray):
     assert game_matrix.ndim == 2
     shape = game_matrix.shape
 
@@ -21,17 +29,23 @@ def maximin(game_matrix: np.ndarray, print_output=False):
         security_level = result.x[-1]
         strategy = result.x[:-1]
 
-        if print_output:
-            print('Security level: ', security_level)
-            print('Maximin strategy: ', strategy)
-        return True, security_level, strategy, result.slack
+        return security_level, strategy, result.slack
     else:
-        return False, result.message
+        raise SolverException(f'The problem could not be solved with the following reason: {result.message}')
+
+
+def maximal_lottery(matrix: Matrix):
+    security_level, lottery, slack = maximin(sympy_to_numpy(matrix))
+    security_level = round(security_level, 3)
+    if security_level != 0:
+        raise SolverException(f'The security level was {security_level} instead of 0, so something went wrong.')
+    lottery = [round(prob, 3) for prob in lottery]
+    slack = [round(prob, 3) for prob in slack]
+    return lottery, slack
 
 
 def t_matrix(matrix: Matrix) -> Matrix:
     matrix = matrix.copy()
-    t = Symbol('t')
     for i in range(len(matrix)):
         matrix[i] = 0 if matrix[i] == 0 else matrix[i] ** t if matrix[i] > 0 else -(-matrix[i]) ** t
     return matrix

@@ -1,6 +1,3 @@
-import sympy
-from sympy import Matrix
-import numpy as np
 from random import randrange, shuffle, choice
 
 from utils import *
@@ -8,9 +5,9 @@ from utils import *
 
 class GameMatrix:
     def __init__(self, matrix):
-        self.matrix = np.asarray(matrix, dtype=int)
-        self.n, m = self.matrix.shape
-        if self.n != m:
+        self.matrix = Matrix(matrix)
+        self.n = self.matrix.rows
+        if self.n != self.matrix.cols:
             raise ValueError(f'Matrix must be square! Received matrix was {self.matrix}')
 
         # Check if the matrix is actually skew-symmetric
@@ -20,15 +17,16 @@ class GameMatrix:
                     raise ValueError(f'Matrix must be skew-symmetric! Received matrix was {self.matrix}')
 
     @classmethod
-    def random_matrix(cls,
-                      alternative_count,
-                      max_margin=30,
-                      ensure_uniqueness=False,
-                      ensure_oddity=False,
-                      exclude_weak_condorcet_winner=False,
-                      exclude_weak_condorcet_loser=False,
-                      exclude_zero=False
-                      ):
+    def random_matrix(
+            cls,
+            alternative_count,
+            max_margin=30,
+            ensure_uniqueness=False,
+            ensure_oddity=False,
+            exclude_weak_condorcet_winner=False,
+            exclude_weak_condorcet_loser=False,
+            exclude_zero=False
+    ):
         assert alternative_count >= 1 and max_margin >= 1
 
         def non_unique_rng():
@@ -84,10 +82,31 @@ class GameMatrix:
     def __str__(self):
         return str(self.matrix)
 
-    def as_sympy(self):
-        return Matrix(self.matrix)
+    def as_numpy(self):
+        return sympy_to_numpy(self.matrix)
+
+    def power_sequence(
+            self,
+            max_power=10,
+            print_output=False,
+            print_slack=False
+    ):
+        lotteries, slacks = [], []
+        matrix = t_matrix(self.matrix)
+        for power in range(max_power + 1):
+            try:
+                curr_matrix = sympy_to_numpy(matrix.subs(t, power))
+                lottery, slack = maximal_lottery(curr_matrix)
+                lotteries.append(lottery)
+                slacks.append(slack)
+                if print_output:
+                    print(f'For \u03C4(x) = x{"" if power == 1 else str(power).translate(superscript)}, '
+                          f'a maximal lottery is {lottery}' + (f' with slack {slack}' if print_slack else ''))
+            except SolverException:
+                break
+        lotteries = np.asarray(lotteries)
+        slacks = np.asarray(slacks)
+        return lotteries, slacks
 
     def rref(self, indices: set[int] = None):
-        return matrix_to_linalg(sub_matrix(t_matrix(self.as_sympy()), indices)).rref()[0]
-
-
+        return matrix_to_linalg(sub_matrix(t_matrix(self.matrix), indices)).rref()[0]
