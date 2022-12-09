@@ -4,9 +4,13 @@ from itertools import permutations
 import numpy as np
 import cvxpy as cp
 from random import randrange, shuffle, choice
-from sympy import Matrix
-import sys
-from scipy.optimize import linprog
+
+import sympy
+from sympy import Matrix, pprint, init_printing
+
+from sample_games import InterestingGames
+from game_matrices import GameMatrix
+from utils import *
 
 
 color_dict = {
@@ -134,30 +138,7 @@ def maximin_cvxpy(game_matrix, print_output=False):
     return prob.status, security_level, strategy
 
 
-def maximin(game_matrix: np.ndarray, print_output=False):
-    assert game_matrix.ndim == 2
-    shape = game_matrix.shape
 
-    result = linprog(
-        c=[0 for i in range(shape[0])] + [-1],
-        A_ub=np.append(-1 * np.transpose(game_matrix), np.full((shape[1], 1), 1), axis=1),
-        b_ub=np.full(shape[1], 0),
-        A_eq=np.append(np.full((1, shape[0]), 1), [[0]], axis=1),
-        b_eq=np.asarray(1.),
-        bounds=[(0, None) for i in range(shape[0])] + [(None, None)],
-        method='highs'
-    )
-
-    if result.success:
-        security_level = result.x[-1]
-        strategy = result.x[:-1]
-
-        if print_output:
-            print('Security level: ', security_level)
-            print('Maximin strategy: ', strategy)
-        return True, security_level, strategy, result.slack
-    else:
-        return False, result.message
 
 
 def shapley_saddle():
@@ -387,336 +368,11 @@ def always_rank_minus_1_test(n, count=1000):
             raise Exception(matrix)
 
 
-class InterestingGames:
-    sample_game = np.array([
-        [0, 1, -3, -3],
-        [-1, 0, 1, 11],
-        [3, -1, 0, -3],
-        [3, -11, 3, 0]
-    ])
-
-    interesting_game_1 = np.array([
-        [0, -67, 89, 17],
-        [67, 0, -91, 12],
-        [-89, 91, 0, -21],
-        [-17, -12, 21, 0]
-    ])
-
-    # Crashed with power 7
-    # [[  0 -31  97   3]
-    #  [ 31   0 -66  45]
-    #  [-97  66   0 -90]
-    #  [ -3 -45  90   0]]
-
-    # Interesting
-    # [[  0 -51  89 -79]
-    #  [ 51   0 -75  82]
-    #  [-89  75   0 -15]
-    #  [ 79 -82  15   0]]
-
-    # TODO check for solution uniqueness
-    # Potential monotonicity violation
-    # [[  0 -32  44  26]
-    #  [ 32   0 -42 -45]
-    #  [-44  42   0  41]
-    #  [-26  45 -41   0]]
-
-    # TODO this was odd, so this might be a real counterexample
-    # Potential monotonicity violation
-    # [[  0  33   9 -25]
-    #  [-33   0  -3  23]
-    #  [ -9   3   0   5]
-    #  [ 25 -23  -5   0]]
-
-    # Another potential mono violation
-    # [[  0  37 -31  19]
-    #  [-37   0 -19  49]
-    #  [ 31  19   0 -39]
-    #  [-19 -49  39   0]]
-
-    # Ditto
-    # [[  0  41  41 -47]
-    #  [-41   0   9  -5]
-    #  [-41  -9   0  25]
-    #  [ 47   5 -25   0]]
-
-    # Ditto, maximum surprisingly at x^3
-    non_mono_at_3 = [
-        [0, -41, 45, 17],
-        [41, 0, -29, 21],
-        [-45, 29, 0, 17],
-        [-17, -21, -17, 0]
-    ]
-
-    # Ditto, for three alternatives
-    mono_violation_game_1 = [
-        [0, -13, 29],
-        [13, 0, -25],
-        [-29, 25, 0]
-    ]
-
-    mono_violation_game_2 = [
-        [0, -15, 13],
-        [15, 0, -9],
-        [-13, 9, 0]
-    ]
-
-    mono_violation_game_3 = [
-        [0, -19, 3],
-        [19, 0, -17],
-        [-3, 17, 0]
-    ]
-
-
-    mono_violation_game_4 = [
-        [0, -15, 5],
-        [15, 0, -20],
-        [-5, 20, 0]
-    ]
-
-    a_vs_b = -5
-
-    test_game = [
-        [0, a_vs_b, 3],
-        [-a_vs_b, 0, -7],
-        [-3, 7, 0]
-    ]
-
-    # Semi-mono violation?
-    # [[  0   1  -1  13]
-    #  [ -1   0 -19   7]
-    #  [  1  19   0  -7]
-    #  [-13  -7   7   0]]
-
-    # Ditto
-    # [[  0  13 -27 -23]
-    #  [-13   0  -7  11]
-    #  [ 27   7   0 -23]
-    #  [ 23 -11  23   0]]
-
-    # Ditto
-    # [[  0  17 -29  -9]
-    #  [-17   0  25   9]
-    #  [ 29 -25   0 -13]
-    #  [  9  -9  13   0]]
-
-    semi_mono_violation = [
-        [0, 15, 13, -19],
-        [-15, 0, 21, -27],
-        [-13, -21, 0, 15],
-        [19, 27, -15, 0]
-    ]
-
-    # Counterexample for iterated removal of bad actions
-    # [[  0  -3  27 -15]
-    #  [  3   0   3  -1]
-    #  [-27  -3   0  11]
-    #  [ 15   1 -11   0]]
-
-    # Counterexample for always winner of C2-ML
-    # [[  0  19 -23 -23]
-    #  [-19   0  21  25]
-    #  [ 23 -21   0 -15]
-    #  [ 23 -25  15   0]]
-
-
-    # Current test
-    # [[  0 -27  23]
-    #  [ 27   0 -11]
-    #  [-23  11   0]]
-
-    # m_da smallest edge, but d wins
-    # [[  0   9  17  -3]
-    #  [ -9   0  25   5]
-    #  [-17 -25   0   7]
-    #  [  3  -5  -7   0]]
-
-    simple_test_game = [
-        [0, 1, 7, -11],
-        [-1, 0, 3, 9],
-        [-7, -3, 0, 5],
-        [11, -9, -5, 0]
-    ]
-
-    # Those two games are interesting because they are identical except for the value of the largest margin,
-    # but seem to converge to different winners.
-    same_order_different_winner_0 = [
-        [0, 11, 7, -9],
-        [-11, 0, 1, 5],
-        [-7, -1, 0, 3],
-        [9, -5, -3, 0]
-    ]
-
-    same_order_different_winner_1 = [
-        [0, 13, 7, -9],
-        [-13, 0, 1, 5],
-        [-7, -1, 0, 3],
-        [9, -5, -3, 0]
-    ]
-
-    slow_convergence = [
-        [0, 25, 17, -27],
-        [-25, 0, 19, 29],
-        [-17, -19, 0, 5],
-        [27, -29, -5, 0]
-    ]
-
-    no_slack_game = [
-        [0, 15, 3, -9],
-        [-15, 0, 1, 25],
-        [-3, -1, 0, 5],
-        [9, -25, -5, 0]
-    ]
-
-    # jumping_at_power_8 = [
-    #     [0, -3, 11, -17],
-    #     [3, 0, -49, 11],
-    #     [-11, 49, 0, 1],
-    #     [17, -11, -1, 0]
-    # ]
-
-    jumping_at_power_8 = [
-        [0, 49, 1, -11],
-        [-49, 0, 11, 3],
-        [-1, -11, 0, 17],
-        [11, -3, -17, 0]
-    ]
-
-    # game with 6 alternatives and only one slacking inequality
-    # [[0 - 7  15   1  15  15]
-    #  [7   0   9   3 - 7 - 29]
-    # [-15 - 9
-    # 0
-    # 13 - 5
-    # 15]
-    # [-1 - 3 - 13   0 - 15  17]
-    # [-15
-    # 7
-    # 5
-    # 15
-    # 0 - 11]
-    # [-15  29 - 15 - 17  11   0]]
-
-    # Weird game with only one single slacking inequality
-    # [[0  25 - 3 - 23 - 15 - 9]
-    #  [-25   0  27 - 21   1 - 11]
-    # [3 - 27
-    # 0
-    # 5
-    # 7
-    # 17]
-    # [23  21 - 5   0  29 - 19]
-    # [15 - 1 - 7 - 29
-    # 0 - 13]
-    # [9  11 - 17  19  13   0]]
-
-    # Changing number of slacking vars
-    slack_var_count_change = [
-        [0, 9, 1, -27, 19, -21],
-        [-9, 0, -5, 3, -17, -25],
-        [-1, 5, 0, -15, 7, 23],
-        [27, -3, 15, 0, -13, 29],
-        [-19, 17, -7, 13, 0, -11],
-        [21, 25, -23, -29, 11, 0]
-    ]
-
-    slacker_supposedly_3 = [
-        [0, 7, 1, -3],
-        [-7, 0, 19, 29],
-        [-1, -19, 0, 11],
-        [3, -29, -11, 0]
-    ]
-
-    # Seems like numerical errors
-    slacker_supposedly_3_v2 = [
-        [0, 13, 1, -23],
-        [-13, 0, 3, 27],
-        [-1, -3, 0, 11],
-        [23, -27, -11, 0]
-    ]
-
-    # Five alternatives, no slackers
-    five_alts_no_slackers = [
-        [0, 5, -3, -21, 43],
-        [-5, 0, 35, -11, -45],
-        [3, -35, 0, 27, -25],
-        [21, 11, -27, 0, -17],
-        [-43, 45, 25, 17, 0]
-    ]
-
-    # Another one
-    # [[0 - 15  47 - 39 - 9]
-    #  [15   0 - 25  43 - 23]
-    # [-47
-    # 25
-    # 0
-    # 13 - 21]
-    # [39 - 43 - 13   0  41]
-    # [9
-    # 23
-    # 21 - 41
-    # 0]]
-
-    simple_example_game = [
-        [0, 3, -1],
-        [-3, 0, 1],
-        [1, -1, 0]
-    ]
-
-    outdated_efficiency_counterexample = [
-        [0, 1, 1, -1, -1, 1, 1, 1, 0, -2],
-        [-1, 0, 1, 1, -1, -2, 1, 1, 1, 0],
-        [-1, -1, 0, 1, 1, 0, -2, 1, 1, 1],
-        [1, -1, -1, 0, 1, 1, 0, -2, 1, 1],
-        [1, 1, -1, -1, 0, 1, 1, 0, -2, 1],
-        [-1, 2, 0, -1, -1, 0, 2, 0, 0, -2],
-        [-1, -1, 2, 0, -1, -2, 0, 2, 0, 0],
-        [-1, -1, -1, 2, 0, 0, -2, 0, 2, 0],
-        [0, -1, -1, -1, 2, 0, 0, -2, 0, 2],
-        [2, 0, -1, -1, -1, 2, 0, 0, -2, 0]
-    ]
-
-    efficiency_counterexample = [
-        [0, 0, 0, 2, 2, -3],
-        [0, 0, 0, -3, 2, 2],
-        [0, 0, 0, 2, -3, 2],
-        [-2, 3, -2, 0, 4, -4],
-        [-2, -2, 3, -4, 0, 4],
-        [3, -2, -2, 4, -4, 0]
-    ]
-
-    # [[0   5  21  11 - 27]
-    #  [-5   0  29 - 23 - 7]
-    # [-21 - 29
-    # 0
-    # 23 - 7]
-    # [-11  23 - 23   0  11]
-    # [27
-    # 7
-    # 7 - 11
-    # 0]]
-
-    two_slack_changes = [
-        [0, -7, 7, -13, -7],
-        [7, 0, 23, -15, -25],
-        [-7, -23, 0, -5, 3],
-        [13, 15, 5, 0, -7],
-        [7, 25, -3, 7, 0]
-    ]
-
-    chris_example = [
-        [0, 3, -1, -1, -1],
-        [-3, 0, 3, 1, 3],
-        [1, -3, 0, -3, 1],
-        [1, -1, 3, 0, -3],
-        [1, -3, -1, 3, 0]
-    ]
-
-
 normalized_four_game_edges = [(0, 1), (1, 2), (2, 3), (0, 2), (1, 3), (3, 0)]
 
 
 if __name__ == '__main__':
+
     # game = create_random_wmg(4, max_margin=30, ensure_oddity=True, exclude_weak_condorcet_winner=True)
     # tail = [(3, 0), (1, 2), (2, 3), (0, 1), (1, 3)]
     # shuffle(tail)
@@ -749,14 +405,22 @@ if __name__ == '__main__':
     # )
     # always_rank_minus_1_test(5, 100000)
 
-    game = InterestingGames.chris_example
+    # t = sympy.Symbol('t')
+    # m = Matrix([[1, 2, t], [0, 1, 2**t], [0, 0, 0]])
+    # print(m.rref())
+
+    pprint(InterestingGames.chris_example.rref())
+
+
+    game = np.asarray(InterestingGames.chris_example)
+
     # print(game)
     # power_sequence(game, max_power=10, print_output=True, print_slack=True)
     # print(rref_from_game(game))
     # print(rref_from_game(t_game(game, 2)))
     # print(rref_from_game(t_game(game, 3)))
 
-    print(Matrix(t_game(game, 4)).rref())
+    # print(Matrix(t_game(game, 4)).rref())
 
     # game = InterestingGames.five_alts_no_slackers
     # game = t_game(game, 1)
