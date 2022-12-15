@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.optimize import linprog
-from sympy import Matrix, zeros, ones, Symbol
+from sympy import Matrix, zeros, ones, Symbol, oo, pprint
 from sympy.functions.elementary.complexes import Abs, sign
 
 superscript = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
@@ -11,11 +11,11 @@ class SolverException(Exception):
 
 
 # TODO check if there is some way to use simplification while changing positive to nonnegative
-def make_variable(name):
-    return Symbol(name, nonnegative=True, integer=True)
+def make_variable(name, force_positive=True):
+    return Symbol(name, positive=force_positive, integer=True)
 
 
-t = Symbol('t', nonnegative=True, integer=True)
+t = make_variable('t')
 
 
 def maximin(game_matrix: np.ndarray):
@@ -53,11 +53,13 @@ def maximal_lottery(matrix: Matrix):
 
 def t_matrix(matrix: Matrix) -> Matrix:
     matrix = matrix.copy()
-    tmp = Symbol('tmp')
-    for s in matrix.free_symbols:
-        matrix = matrix.subs(s, tmp)
-        matrix = matrix.subs(-tmp, -s**t)
-        matrix = matrix.subs(tmp, s**t)
+    for i in range(len(matrix)):
+        matrix[i] = 0 if matrix == 0 else Abs(matrix[i])**t * sign(matrix[i])
+    # tmp = Symbol('tmp')
+    # for s in matrix.free_symbols:
+    #     matrix = matrix.subs(s, tmp)
+    #     matrix = matrix.subs(-tmp, -s**t)
+    #     matrix = matrix.subs(tmp, s**t)
     return matrix
 
 
@@ -83,3 +85,34 @@ def matrix_to_linalg(matrix: Matrix) -> Matrix:
 
 def sympy_to_numpy(matrix: Matrix):
     return np.array(matrix).astype(int)
+
+
+def has_condorcet_case(matrix: Matrix):
+    for sym in matrix.free_symbols:
+        matrix = matrix.subs(sym, 1)
+    return (matrix * Matrix.ones(matrix.rows, 1)).norm(ord=oo) == matrix.rows - 1
+
+
+def support_set(lottery):
+    return {i for (i, p) in enumerate(lottery) if p > 0}
+
+
+def print_rref(arg: (Matrix, list)):
+    if arg[1]:
+        print(f'Assuming supp(ML_t) = {set(range(arg[0].rows + len(arg[1]) - 1)) - {i for i, _ in arg[1]} }')
+    else:
+        print('Assuming full support:')
+    pprint(arg[0])
+    for index, inequality in arg[1]:
+        print(f'Inequality {index}:')
+        pprint(inequality)
+
+
+# def detect_slack_change(slacks):
+#     positive_slacks = np.greater_equal(slacks, 0.001)
+#     slacking_vars
+#
+#     def all_slacking_alts(slacks):
+#         positive_slacks = np.greater_equal(slacks, 0.001)
+#         positive_vars = np.any(positive_slacks, axis=0)
+#         return set(np.where(positive_vars)[0])

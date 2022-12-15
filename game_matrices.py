@@ -2,6 +2,9 @@ from random import randrange, shuffle, choice
 
 from utils import *
 
+s = make_variable('s')
+l = make_variable('l')
+
 
 class GameMatrix:
     def __init__(self, matrix):
@@ -17,9 +20,9 @@ class GameMatrix:
                     raise ValueError(f'Matrix must be skew-symmetric! Received matrix was {self.matrix}')
 
         self.free_symbols = self.matrix.free_symbols
-        for s in self.free_symbols:
-            if not s.is_nonnegative:
-                raise ValueError(f'All variables used in the matrix must be declared to be non-negative.')
+        # for s in self.free_symbols:
+        #     if not s.is_nonnegative:
+        #         raise ValueError(f'All variables used in the matrix must be declared to be non-negative.')
 
     @classmethod
     def random_matrix(
@@ -84,11 +87,28 @@ class GameMatrix:
                     )
         return GameMatrix(weighted_majority_graph)
 
+    @classmethod
+    def random_dichotomous_matrix(cls, alternatives, exclude_condorcet_cases=True):
+        matrix = Matrix.zeros(alternatives)
+        for i in range(alternatives):
+            for j in range(i + 1, alternatives):
+                matrix[i, j] = choice([s, l, -s, -l])
+                matrix[j, i] = -matrix[i, j]
+
+        if exclude_condorcet_cases:
+            if has_condorcet_case(matrix):
+                return GameMatrix.random_dichotomous_matrix(alternatives=alternatives, exclude_condorcet_cases=True)
+
+        return GameMatrix(matrix)
+
     def __str__(self):
         return str(self.matrix)
 
     def as_numpy(self):
         return sympy_to_numpy(self.matrix)
+
+    def subs(self, args, kwargs):
+        self.matrix = self.matrix.subs(args, kwargs)
 
     def power_sequence(
             self,
@@ -113,5 +133,18 @@ class GameMatrix:
         slacks = np.asarray(slacks)
         return lotteries, slacks
 
+    def detect_support_changes_numeric(self, max_power=6, print_output=False):
+        lotteries, _ = self.power_sequence(max_power=max_power)
+        supports = [support_set(lottery) for lottery in lotteries]
+        for power, (s1, s2) in enumerate(zip(supports, supports[1:])):
+            if s1 != s2:
+                if print_output:
+                    print(f'The support of this game changes between powers {power} and {power + 1}.')
+                return True
+        return False
+
     def rref(self, indices: set[int] = None):
-        return matrix_to_linalg(sub_matrix(t_matrix(self.matrix), indices)).rref()[0]
+        matrix_rref = matrix_to_linalg(sub_matrix(t_matrix(self.matrix), indices)).rref()[0]
+        return (matrix_rref,
+                [(j, t_matrix(self.matrix)[:, j].transpose()) for j in range(self.matrix.rows) if j not in indices]
+                if indices else [])

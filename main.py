@@ -2,6 +2,7 @@ from sympy import Matrix, pprint, init_printing
 
 from sample_games import InterestingGames
 from utils import *
+from game_matrices import GameMatrix, s, l
 
 
 # color_dict = {
@@ -56,8 +57,33 @@ from utils import *
 #         if np.linalg.matrix_rank(matrix) != n - 1:
 #             raise Exception(matrix)
 
+def find_support_changing_game(alternatives, tries=1000):
+    for i in range(tries):
+        curr_game = GameMatrix.random_dichotomous_matrix(alternatives=alternatives)
+        curr_game.subs(s, 1)
+        curr_game.subs(l, 29)
+        if curr_game.detect_support_changes_numeric():
+            pprint(curr_game.matrix)
+            print(curr_game.matrix)
+            return True
+    return False
+
+
 if __name__ == '__main__':
     # pprint(InterestingGames.generic_chris_example.rref())
-    pprint(InterestingGames.generic_chris_example.rref())
+    # game = GameMatrix.random_dichotomous_matrix(7)
 
-    InterestingGames.chris_example.power_sequence(print_output=True, print_slack=True)
+    game = InterestingGames.dichotomous_support_change
+    print_rref(game.rref({0, 1, 3}))
+    print_rref(game.rref({0, 1, 4}))
+    game.subs(s, 25)
+    game.subs(l, 29)
+    game.power_sequence(print_output=True, print_slack=True)
+
+    # pprint(game.rref())
+    # pprint(game.matrix)
+    # game.detect_support_changes_numeric(print_output=True)
+
+    # find_support_changing_game(5)
+
+    # InterestingGames.chris_example.power_sequence(print_output=True, print_slack=True)

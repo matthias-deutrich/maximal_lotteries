@@ -1,4 +1,4 @@
-from game_matrices import GameMatrix
+from game_matrices import GameMatrix, s, l
 from sympy import Matrix
 from utils import make_variable
 
@@ -328,9 +328,6 @@ class InterestingGames:
         [1, -3, -1, 3, 0]
     ])
 
-    s = make_variable('s')
-    l = make_variable('l')
-
     generic_chris_example = GameMatrix(
         Matrix([
             [0, l, -s, -s, -s],
@@ -338,5 +335,72 @@ class InterestingGames:
             [s, -l, 0, -l, s],
             [s, -s, l, 0, -l],
             [s, -l, -s, l, 0]
+        ])
+    )
+
+    generic_five_example_2 = GameMatrix(
+        Matrix([
+            [0, l, -l, -s, -s],
+            [-l, 0, l, s, l],
+            [l, -l, 0, s, s],
+            [s, -s, -s, 0, l],
+            [s, -l, -s, -l, 0]
+        ])
+    )
+
+    a = make_variable('a', force_positive=False)
+    b = make_variable('b', force_positive=False)
+    c = make_variable('c', force_positive=False)
+    d = make_variable('d', force_positive=False)
+    e = make_variable('e', force_positive=False)
+    f = make_variable('f', force_positive=False)
+    g = make_variable('g', force_positive=False)
+    h = make_variable('h', force_positive=False)
+    i = make_variable('i', force_positive=False)
+    j = make_variable('j', force_positive=False)
+
+    generic_five_game = GameMatrix(
+        Matrix([
+            [0, a, e, h, j],
+            [-a, 0, b, f, i],
+            [-e, -b, 0, c, g],
+            [-h, -f, -c, 0, d],
+            [-j, -i, -g, -d, 0]
+        ])
+    )
+
+    # semi_generic_five_game_4_alts = generic_five_game.subs()
+    dichotomous_support_change_7alts = GameMatrix(
+        Matrix([
+            [0, -l, l, s, -l, s, -s],
+            [l, 0, l, s, s, -l, s],
+            [-l, -l, 0, l, l, s, -l],
+            [-s, -s, -l, 0, l, -l, l],
+            [l, -s, -l, -l, 0, s, -s],
+            [-s, l, -s, l, -s, 0, -l],
+            [s, -s, l, -l, s, l, 0]
+        ])
+    )
+    # ⎡ 0   -29  29   21   -29  21   -21⎤
+    # ⎢                                 ⎥
+    # ⎢29    0   29   21   21   -29  21 ⎥
+    # ⎢                                 ⎥
+    # ⎢-29  -29   0   29   29   21   -29⎥
+    # ⎢                                 ⎥
+    # ⎢-21  -21  -29   0   29   -29  29 ⎥
+    # ⎢                                 ⎥
+    # ⎢29   -21  -29  -29   0   21   -21⎥
+    # ⎢                                 ⎥
+    # ⎢-21  29   -21  29   -21   0   -29⎥
+    # ⎢                                 ⎥
+    # ⎣21   -21  29   -29  21   29    0 ⎦
+
+    dichotomous_support_change = GameMatrix(
+        Matrix([
+            [0, s, s, -s, -l],
+            [-s, 0, l, l, l],
+            [-s, -l, 0, -s, l],
+            [s, -l, s, 0, s],
+            [l, -l, -l, -s, 0]
         ])
     )
