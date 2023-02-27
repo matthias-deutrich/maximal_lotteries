@@ -97,15 +97,16 @@ def support_set(lottery):
     return {i for (i, p) in enumerate(lottery) if p > 0}
 
 
-def print_rref(arg: (Matrix, list)):
-    if arg[1]:
-        print(f'Assuming supp(ML_t) = {set(range(arg[0].rows + len(arg[1]) - 1)) - {i for i, _ in arg[1]} }')
+def print_rref(rref: Matrix, inequalities: list = None):
+    if inequalities:
+        print(f'Assuming supp(ML_t) = {set(range(len(inequalities[0][1]))) - {i for i, _ in inequalities} }')
     else:
         print('Assuming full support:')
-    pprint(arg[0])
-    for index, inequality in arg[1]:
-        print(f'Inequality {index}:')
-        pprint(inequality)
+    pprint(rref)
+    if inequalities:
+        for index, inequality in inequalities:
+            print(f'Inequality {index}:')
+            pprint(inequality)
 
 
 # def detect_slack_change(slacks):

@@ -60,9 +60,9 @@ from game_matrices import GameMatrix, s, l
 def find_support_changing_game(alternatives, tries=1000):
     for i in range(tries):
         curr_game = GameMatrix.random_dichotomous_matrix(alternatives=alternatives)
-        curr_game.subs(s, 1)
+        curr_game.subs(s, 21)
         curr_game.subs(l, 29)
-        if curr_game.detect_support_changes_numeric():
+        if curr_game.detect_support_changes_numeric(print_output=True):
             pprint(curr_game.matrix)
             print(curr_game.matrix)
             return True
@@ -74,15 +74,64 @@ if __name__ == '__main__':
     # game = GameMatrix.random_dichotomous_matrix(7)
 
     game = InterestingGames.dichotomous_support_change
-    print_rref(game.rref({0, 1, 3}))
-    print_rref(game.rref({0, 1, 4}))
+    game.force_positive_symbols()
+    game.solve_assuming_support({0, 1, 3}, print_output=True)
+    game.solve_assuming_support({0, 1, 4}, print_output=True)
+
+    game_rref = game.rref({0, 1, 4}, add_validity_condition=False)[0]
+    pprint(game_rref)
+    game_rref_coeff = game_rref.row_insert(game_rref.rows, Matrix.ones(1, game_rref.cols))
+    print('Rank of coefficient matrix: ', game_rref_coeff.rank())
+    rhs = Matrix.zeros(game_rref_coeff.rows, 1)
+    rhs[-1] = 1
+    game_rref_augmented = game_rref_coeff.col_insert(game_rref_coeff.cols, rhs)
+    print('Rank of augmented matrix: ', game_rref_augmented.rank())
+    # print_rref(game_rref)
+
     game.subs(s, 25)
     game.subs(l, 29)
-    game.power_sequence(print_output=True, print_slack=True)
+    # game.power_sequence(print_output=True, print_slack=True)
+
+    # game = InterestingGames.generic_four_game
+    # game.force_positive_symbols()
+    # visual_ledermann_proof(game.t_matrix())
+
+    # game = InterestingGames.dichotomous_support_change_7alts
+    # game.solve_assuming_support({1, 5, 6}, print_output=True)
+    # game.solve_assuming_support({0, 1, 3, 5, 6}, print_output=True)
+    # game.subs(s, 25)
+    # game.subs(l, 29)
+    # game.power_sequence(print_output=True, print_slack=True)
 
     # pprint(game.rref())
     # pprint(game.matrix)
     # game.detect_support_changes_numeric(print_output=True)
+
+    # game = InterestingGames.two_slack_changes
+    # # game.solve_assuming_support(print_output=True)
+    # game.solve_assuming_support({2, 3, 4}, print_output=True)
+    # game.solve_assuming_support({0, 2, 4}, print_output=True)
+    # game.power_sequence(print_output=True, print_slack=True)
+
+    # tmp = Matrix([
+    #     [0, s**t, s**t, -l**t],
+    #     [-s**t, 0, l**t, -l**t],
+    #     [-s**t, -l**t, 0, s**t],
+    #     [l**t, l**t, -s**t, 0]
+    # ])
+    # tmp = Matrix([
+    #     [0, s ** t, s ** t, s ** t],
+    #     [-s ** t, 0, s ** t, l ** t],
+    #     [-s ** t, -s ** t, 0, s ** t],
+    #     [-s ** t, -l ** t, -s ** t, 0]
+    # ])
+    # pprint(tmp.rref()[0])
+    # tmp2 = tmp.subs(s, 1).subs(l, 2)
+    # pprint(tmp2.rref()[0])
+    # tmp3 = tmp2.subs(t, 1)
+    # pprint(tmp3)
+    # pprint(tmp3.rref()[0])
+
 
     # find_support_changing_game(5)
 

@@ -110,6 +110,15 @@ class GameMatrix:
     def subs(self, args, kwargs):
         self.matrix = self.matrix.subs(args, kwargs)
 
+    def t_matrix(self):
+        return t_matrix(self.matrix)
+
+    def force_positive_symbols(self):
+        tmp = make_variable('tmp', force_positive=True)
+        for sym in self.matrix.free_symbols:
+            self.subs(sym, tmp)
+            self.subs(tmp, make_variable(sym.name, force_positive=True))
+
     def power_sequence(
             self,
             max_power=10,
@@ -139,12 +148,48 @@ class GameMatrix:
         for power, (s1, s2) in enumerate(zip(supports, supports[1:])):
             if s1 != s2:
                 if print_output:
-                    print(f'The support of this game changes between powers {power} and {power + 1}.')
+                    print(f'The support of this game changes between powers {power} and {power + 1}, '
+                          f'with the original support having size {len(s1)} and the new one size {len(s2)}.')
                 return True
         return False
 
-    def rref(self, indices: set[int] = None):
-        matrix_rref = matrix_to_linalg(sub_matrix(t_matrix(self.matrix), indices)).rref()[0]
+    def rref(self, indices: set[int] = None, add_validity_condition=True):
+        matrix = sub_matrix(t_matrix(self.matrix), indices)
+        if add_validity_condition:
+            matrix = matrix_to_linalg(matrix)
+        matrix_rref = matrix.rref()[0]
         return (matrix_rref,
-                [(j, t_matrix(self.matrix)[:, j].transpose()) for j in range(self.matrix.rows) if j not in indices]
+                [(j, t_matrix(self.matrix)[:, j].transpose()) for j in range(self.n) if j not in indices]
                 if indices else [])
+
+    def solve_assuming_support(self, indices: set[int] = None, print_output=False):
+        if (len(indices) if indices else self.n) % 2 == 0:
+            raise SolverException('The size of the matrix must be odd.')
+        rref, _ = self.rref(indices=indices, add_validity_condition=True)
+        if rref[-1] != 0:
+            raise SolverException('The rank of the matrix was full, which should not be possible.')
+        if rref[-2, -2] != 1:
+            raise SolverException('The rank of the matrix was less than n - 1, which should not be possible.')
+        if indices:
+            solution = Matrix.zeros(self.n, 1)
+            for i, k in enumerate(sorted(indices)):
+                solution[k] = rref[i, -1]
+        else:
+            solution = rref[:-1, -1]
+        solution = solution.transpose()
+        inequalities = [solution * t_matrix(self.matrix)[:, i] for i in range(self.n) if i not in indices]\
+            if indices else None
+
+        if print_output:
+            if indices:
+                print(f'Assuming supp(ML_t) = {indices}, a solution is:')
+                pprint(solution)
+                print('To be valid, this solution must fulfil the following inequalities:')
+                for ineq in inequalities:
+                    pprint(ineq[0] >= 0)
+            else:
+                print('Assuming full support, a solution is:')
+                pprint(solution)
+
+        return solution, inequalities
+

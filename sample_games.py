@@ -358,6 +358,20 @@ class InterestingGames:
     h = make_variable('h', force_positive=False)
     i = make_variable('i', force_positive=False)
     j = make_variable('j', force_positive=False)
+    k = make_variable('k', force_positive=False)
+    l = make_variable('l', force_positive=False)
+    m = make_variable('m', force_positive=False)
+    n = make_variable('n', force_positive=False)
+    o = make_variable('o', force_positive=False)
+
+    generic_four_game = GameMatrix(
+        Matrix([
+            [0, a, d, f],
+            [-a, 0, b, e],
+            [-d, -b, 0, c],
+            [-f, -e, -c, 0]
+        ])
+    )
 
     generic_five_game = GameMatrix(
         Matrix([
@@ -366,6 +380,17 @@ class InterestingGames:
             [-e, -b, 0, c, g],
             [-h, -f, -c, 0, d],
             [-j, -i, -g, -d, 0]
+        ])
+    )
+
+    generic_six_game = GameMatrix(
+        Matrix([
+            [0, a, f, j, m, o],
+            [-a, 0, b, g, k, n],
+            [-f, -b, 0, c, h, l],
+            [-j, -g, -c, 0, d, i],
+            [-m, -k, -h, -d, 0, e],
+            [-o, -n, -l, -i, -e, 0]
         ])
     )
 
@@ -402,5 +427,18 @@ class InterestingGames:
             [-s, -l, 0, -s, l],
             [s, -l, s, 0, s],
             [l, -l, -l, -s, 0]
+        ])
+    )
+
+    wat = GameMatrix(
+        Matrix([[0, -s, -s, -s, s], [s, 0, l, -s, l], [s, -l, 0, -s, -l], [s, s, s, 0, -s], [-s, -l, l, s, 0]]))
+    
+    dichotomous_support_size_change = GameMatrix(
+        Matrix([
+            [0, s, -s, -s, -l],
+            [-s, 0, l, l, s],
+            [s, -l, 0, s, -l],
+            [s, -l, -s, 0, l],
+            [l, -s, l, -l, 0]
         ])
     )
