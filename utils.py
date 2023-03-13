@@ -1,7 +1,11 @@
+import math
+
 import numpy as np
 from scipy.optimize import linprog
-from sympy import Matrix, zeros, ones, Symbol, oo, pprint
+from sympy import Matrix, zeros, ones, Symbol, oo, pprint, powsimp
 from sympy.functions.elementary.complexes import Abs, sign
+from sympy.core import *
+from sympy.ntheory.ecm import ecm
 
 superscript = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
 
@@ -51,10 +55,11 @@ def maximal_lottery(matrix: Matrix):
     return lottery, slack
 
 
-def t_matrix(matrix: Matrix) -> Matrix:
+def t_matrix(matrix: Matrix, fixed_t=None) -> Matrix:
+    used_t = t if fixed_t is None else fixed_t
     matrix = matrix.copy()
     for i in range(len(matrix)):
-        matrix[i] = 0 if matrix == 0 else Abs(matrix[i])**t * sign(matrix[i])
+        matrix[i] = 0 if matrix == 0 else Abs(matrix[i])**used_t * sign(matrix[i])
     # tmp = Symbol('tmp')
     # for s in matrix.free_symbols:
     #     matrix = matrix.subs(s, tmp)
@@ -117,3 +122,60 @@ def print_rref(rref: Matrix, inequalities: list = None):
 #         positive_slacks = np.greater_equal(slacks, 0.001)
 #         positive_vars = np.any(positive_slacks, axis=0)
 #         return set(np.where(positive_vars)[0])
+
+def base_gcd(exp):
+    bases = []
+    factors = exp.args if isinstance(exp, Add) else [exp]
+    for s in factors:
+        s = s.args[1] if isinstance(s, Mul) and len(s.args) == 2 and isinstance(s.args[0], Integer) else s
+        if isinstance(s, Pow):
+            if len(s.args) == 2 and s.args[1] == t and isinstance(s.args[0], Integer):
+                bases.append(int(s.args[0]))
+        else:
+            return 1
+    return math.gcd(*bases)
+
+
+def simplify_fraction(numerator, denominator):
+    numerator = numerator.powsimp()
+    num_gcd = base_gcd(numerator)
+
+    denominator = denominator.powsimp()
+    den_gcd = base_gcd(denominator)
+
+    total_gcd = math.gcd(num_gcd, den_gcd)
+
+    return ((numerator / total_gcd ** t).expand().powsimp(combine='base')
+            / (denominator / total_gcd ** t).expand().powsimp(combine='base'))
+    #
+    # tmp = (numerator / total_gcd ** t)
+    # tmp2 = (denominator / total_gcd ** t)
+    # pprint(tmp)
+    # pprint(tmp2)
+    #
+    # pprint(numerator.powsimp())
+    # tmp = numerator + denominator
+    # pprint(tmp)
+    # print('here')
+    # pprint((tmp.powsimp() / (2 ** t)))
+    # pprint((tmp.powsimp() / (2 ** t)).expand())
+    # pprint(powsimp((tmp.powsimp() / (5 ** t)).expand(), combine='base'))
+    # # pprint(expand_power_base((tmp.powsimp() / (2 ** t)).expand()))
+    # # pprint((tmp.powsimp() / (2 ** t)).expand().expand_power_base())
+    # # pprint((tmp.powsimp() / (2 ** t)).expand().powsimp())
+    # # pprint(denominator)
+    # return numerator / denominator
+
+
+def custom_simplify(exp: Expr):
+    if isinstance(exp, Mul):
+        num_list, den_list = [], []
+        for e in exp.args:
+            if isinstance(e, Pow) and len(e.args) == 2 and e.args[1] == -1:
+                den_list.append(e.args[0])
+            else:
+                num_list.append(e)
+        if num_list and den_list:
+            return simplify_fraction(numerator=Mul(*num_list), denominator=Mul(*den_list))
+
+    return exp

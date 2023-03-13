@@ -1,5 +1,5 @@
 from random import randrange, shuffle, choice
-
+from sympy import simplify, expand, cancel, powsimp, factor, gcd
 from utils import *
 
 s = make_variable('s')
@@ -20,6 +20,8 @@ class GameMatrix:
                     raise ValueError(f'Matrix must be skew-symmetric! Received matrix was {self.matrix}')
 
         self.free_symbols = self.matrix.free_symbols
+
+        self.fixed_t = None
         # for s in self.free_symbols:
         #     if not s.is_nonnegative:
         #         raise ValueError(f'All variables used in the matrix must be declared to be non-negative.')
@@ -110,8 +112,11 @@ class GameMatrix:
     def subs(self, args, kwargs):
         self.matrix = self.matrix.subs(args, kwargs)
 
+    def fix_t(self, fixed_t: int):
+        self.fixed_t = fixed_t
+
     def t_matrix(self):
-        return t_matrix(self.matrix)
+        return t_matrix(self.matrix, fixed_t=self.fixed_t)
 
     def force_positive_symbols(self):
         tmp = make_variable('tmp', force_positive=True)
@@ -154,7 +159,7 @@ class GameMatrix:
         return False
 
     def rref(self, indices: set[int] = None, add_validity_condition=True):
-        matrix = sub_matrix(t_matrix(self.matrix), indices)
+        matrix = sub_matrix(self.t_matrix(), indices)
         if add_validity_condition:
             matrix = matrix_to_linalg(matrix)
         matrix_rref = matrix.rref()[0]
@@ -162,33 +167,99 @@ class GameMatrix:
                 [(j, t_matrix(self.matrix)[:, j].transpose()) for j in range(self.n) if j not in indices]
                 if indices else [])
 
-    def solve_assuming_support(self, indices: set[int] = None, print_output=False):
+    def general_mpi(self, indices: set[int] = None, add_validity_condition=True):
+        matrix = sub_matrix(self.t_matrix(), indices)
+        if add_validity_condition:
+            matrix = matrix_to_linalg(matrix)
+            matrix = matrix[:, :-1]
+        return matrix.pinv()
+
+    def left_mpi(self, indices: set[int] = None, add_validity_condition=True, inversion_method='ADJ'):
+        matrix = sub_matrix(self.t_matrix(), indices)
+        if add_validity_condition:
+            matrix = matrix_to_linalg(matrix)
+            matrix = matrix[:, :-1]
+
+        tmp = matrix.transpose() * matrix
+
+        if inversion_method == 'ADJ':
+            inv = tmp.inverse_ADJ()
+        elif inversion_method == 'BLOCK':
+            inv = tmp.inverse_BLOCK()
+        elif inversion_method == 'CH':
+            inv = tmp.inverse_CH()
+        elif inversion_method == 'GE':
+            inv = tmp.inverse_GE()
+        elif inversion_method == 'LDL':
+            inv = tmp.inverse_LDL()
+        elif inversion_method == 'LU':
+            inv = tmp.inverse_LU()
+        elif inversion_method == 'QR':
+            inv = tmp.inverse_QR()
+        else:
+            inv = tmp.inv()
+
+        solution = inv * matrix.transpose()
+        return solution.applyfunc(simplify) if inversion_method == 'ADJ' else solution
+        # return (matrix.transpose() * matrix).inverse_LDL() * matrix.transpose()
+
+    # def mpi_solution(self, indices: set[int] = None):
+    #     support_solution = self.mpi(indices=indices, add_validity_condition=True)
+    #     if indices:
+    #         solution = Matrix.zeros(self.n, 1)
+    #         for i, k in enumerate(sorted(indices)):
+    #             solution[k] = support_solution[i, -1]
+    #     else:
+    #         solution = support_solution[:, -1]
+    #     return solution.transpose()
+
+    def solve_assuming_support(self, indices: set[int] = None, mode='rref', inversion_method='ADJ',
+                               use_custom_simplification=True, print_output=False):
         if (len(indices) if indices else self.n) % 2 == 0:
             raise SolverException('The size of the matrix must be odd.')
-        rref, _ = self.rref(indices=indices, add_validity_condition=True)
-        if rref[-1] != 0:
-            raise SolverException('The rank of the matrix was full, which should not be possible.')
-        if rref[-2, -2] != 1:
-            raise SolverException('The rank of the matrix was less than n - 1, which should not be possible.')
+
+        if mode == 'general_mpi':
+            matrix_solution = self.general_mpi(indices=indices, add_validity_condition=True)
+        elif mode == 'left_mpi':
+            matrix_solution = self.left_mpi(indices=indices,
+                                            inversion_method=inversion_method,
+                                            add_validity_condition=True)
+        else:
+            mode = 'rref'
+            rref, _ = self.rref(indices=indices, add_validity_condition=True)
+            if rref[-1] != 0:
+                raise SolverException('The rank of the matrix was full, which should not be possible.')
+            if rref[-2, -2] != 1:
+                raise SolverException('The rank of the matrix was less than n - 1, which should not be possible.')
+            matrix_solution = rref[:-1, :]
+
         if indices:
             solution = Matrix.zeros(self.n, 1)
             for i, k in enumerate(sorted(indices)):
-                solution[k] = rref[i, -1]
+                solution[k] = matrix_solution[i, -1]
         else:
-            solution = rref[:-1, -1]
+            solution = matrix_solution[:, -1]
         solution = solution.transpose()
-        inequalities = [solution * t_matrix(self.matrix)[:, i] for i in range(self.n) if i not in indices]\
-            if indices else None
+
+        inequalities = [(solution * self.t_matrix()[:, i])[0] for i in range(self.n) if i not in indices]\
+            if indices else []
+
+        if use_custom_simplification:
+            solution = solution.applyfunc(custom_simplify)
+            inequalities = [custom_simplify(cancel(ineq)) for ineq in inequalities]
+
+        inequalities = [ineq >= 0 for ineq in inequalities]
 
         if print_output:
             if indices:
-                print(f'Assuming supp(ML_t) = {indices}, a solution is:')
+                print(f'Assuming supp(ML_t) = {indices}, a solution (computed in {mode} mode) is:')
                 pprint(solution)
                 print('To be valid, this solution must fulfil the following inequalities:')
+
                 for ineq in inequalities:
-                    pprint(ineq[0] >= 0)
+                    pprint(ineq)
             else:
-                print('Assuming full support, a solution is:')
+                print(f'Assuming full support, a solution (computed in {mode} mode) is:')
                 pprint(solution)
 
         return solution, inequalities

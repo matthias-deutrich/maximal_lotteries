@@ -1,8 +1,9 @@
-from sympy import Matrix, pprint, init_printing
+from sympy import Matrix, pprint, init_printing, simplify
 
 from sample_games import InterestingGames
 from utils import *
 from game_matrices import GameMatrix, s, l
+from timeit import default_timer as timer
 
 
 # color_dict = {
@@ -68,29 +69,123 @@ def find_support_changing_game(alternatives, tries=1000):
             return True
     return False
 
+def time_solutions(game, support, t_val):
+    # INVERSION TIMES (one sample):
+    # ADJ: 81
+    # BLOCK: 46
+    # CH: 46
+    # GE: did not finish
+    # LDL: 46
+    # LU: 46
+    # QR: did not finish
+    start = timer()
+    left_mpi_solution = game.solve_assuming_support(support, mode='left_mpi',
+                                                    inversion_method='ADJ', print_output=False)[0]
+    end = timer()
+    print(f'ADJ took {end - start}')
+    pprint(left_mpi_solution.subs(t, t_val))
+    pprint(left_mpi_solution.applyfunc(simplify))
+
+    start = timer()
+    left_mpi_solution = game.solve_assuming_support(support, mode='left_mpi',
+                                                    inversion_method='BLOCK', print_output=False)[0]
+    end = timer()
+    print(f'BLOCK took {end - start}')
+    pprint(left_mpi_solution.subs(t, t_val))
+    # pprint(left_mpi_solution.applyfunc(simplify))
+
+    start = timer()
+    left_mpi_solution = game.solve_assuming_support(support, mode='left_mpi',
+                                                    inversion_method='CH', print_output=False)[0]
+    end = timer()
+    print(f'CH took {end - start}')
+    pprint(left_mpi_solution.subs(t, t_val))
+    # pprint(left_mpi_solution.applyfunc(simplify))
+
+    # start = timer()
+    # left_mpi_solution = game.solve_assuming_support(support, mode='left_mpi',
+    #                                                 inversion_method='GE', print_output=False)[0]
+    # end = timer()
+    # print(f'GE took {end - start}')
+    # pprint(left_mpi_solution.subs(t, t_val))
+
+    start = timer()
+    left_mpi_solution = game.solve_assuming_support(support, mode='left_mpi',
+                                                    inversion_method='LDL', print_output=False)[0]
+    end = timer()
+    print(f'LDL took {end - start}')
+    pprint(left_mpi_solution.subs(t, t_val))
+    # pprint(left_mpi_solution.applyfunc(simplify))
+
+    start = timer()
+    left_mpi_solution = game.solve_assuming_support(support, mode='left_mpi',
+                                                    inversion_method='LU', print_output=False)[0]
+    end = timer()
+    print(f'LU took {end - start}')
+    pprint(left_mpi_solution.subs(t, t_val))
+    # pprint(left_mpi_solution.applyfunc(simplify))
+
+    # start = timer()
+    # left_mpi_solution = game.solve_assuming_support(support, mode='left_mpi',
+    #                                                 inversion_method='QR', print_output=False)[0]
+    # end = timer()
+    # print(f'QR took {end - start}')
+    # pprint(left_mpi_solution.subs(t, t_val))
+
 
 if __name__ == '__main__':
     # pprint(InterestingGames.generic_chris_example.rref())
-    # game = GameMatrix.random_dichotomous_matrix(7)
 
-    game = InterestingGames.dichotomous_support_change
-    game.force_positive_symbols()
-    game.solve_assuming_support({0, 1, 3}, print_output=True)
-    game.solve_assuming_support({0, 1, 4}, print_output=True)
+    # game = GameMatrix.random_matrix(5, exclude_weak_condorcet_winner=True,
+    #                                 exclude_weak_condorcet_loser=True, exclude_zero=True)
+    game = InterestingGames.presentation_game_chosen
+    #
+    # # game = InterestingGames.dichotomous_support_change
+    # game.force_positive_symbols()
+    # game.solve_assuming_support({0, 1, 3}, print_output=True)
+    # game.solve_assuming_support({0, 1, 4}, print_output=True)
+    # game_rref = game.rref({0, 1, 4}, add_validity_condition=False)[0]
+    # pprint(game_rref)
+    # game_rref_coeff = game_rref.row_insert(game_rref.rows, Matrix.ones(1, game_rref.cols))
+    # print('Rank of coefficient matrix: ', game_rref_coeff.rank())
+    # rhs = Matrix.zeros(game_rref_coeff.rows, 1)
+    # rhs[-1] = 1
+    # game_rref_augmented = game_rref_coeff.col_insert(game_rref_coeff.cols, rhs)
+    # print('Rank of augmented matrix: ', game_rref_augmented.rank())
+    # # print_rref(game_rref)
+    # game.subs(s, 25)
+    # game.subs(l, 29)
 
-    game_rref = game.rref({0, 1, 4}, add_validity_condition=False)[0]
-    pprint(game_rref)
-    game_rref_coeff = game_rref.row_insert(game_rref.rows, Matrix.ones(1, game_rref.cols))
-    print('Rank of coefficient matrix: ', game_rref_coeff.rank())
-    rhs = Matrix.zeros(game_rref_coeff.rows, 1)
-    rhs[-1] = 1
-    game_rref_augmented = game_rref_coeff.col_insert(game_rref_coeff.cols, rhs)
-    print('Rank of augmented matrix: ', game_rref_augmented.rank())
-    # print_rref(game_rref)
 
-    game.subs(s, 25)
-    game.subs(l, 29)
-    # game.power_sequence(print_output=True, print_slack=True)
+
+
+    print(game)
+    game.power_sequence(print_output=True, print_slack=True)
+
+    # support = {0, 2, 4}
+    # support = {1, 3, 4}
+    support = None
+    t_val = 2
+    # time_solutions(game, support,t_val)
+    # game.fix_t(t_val)
+
+    main_solution, main_inequalities = game.solve_assuming_support(support, print_output=True)
+    pprint(main_solution.subs(t, 0))
+    pprint(main_solution.subs(t, 1))
+    pprint(main_solution.subs(t, 2))
+    pprint(main_solution.subs(t, 3))
+    # left_mpi_solution = game.solve_assuming_support(support, mode='left_mpi', print_output=True)[0]
+    # pprint(rref_solution.subs(t, t_val))
+
+
+
+    # general_mpi_solution = game.solve_assuming_support(support, mode='general_mpi', print_output=True)[0]
+
+    # pprint(rref_solution.subs(t, t_val))
+    # pprint(mpi_solution.subs(t, t_val))
+
+    # game.solve_assuming_support(print_output=True)
+    # game.solve_assuming_support({1, 3, 4}, print_output=True)
 
     # game = InterestingGames.generic_four_game
     # game.force_positive_symbols()
